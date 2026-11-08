@@ -1,0 +1,12 @@
+# Secret scanning for this repo: the gitleaks defaults plus one narrow allowlist.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The four UJIRA Soroban contract addresses on Stellar testnet, shown in app.html. They are public on-chain identifiers that anyone can read on stellar.expert, not credentials. Each entry matches one exact address and nothing else."
+regexes = [
+  '''^CB4AYBA5NVQPVPNOWUCSZQK6ZIGOF7KSCS6SF6UV6D2OKPDXLHEPD4V7$''',
+  '''^CCNW4YFXTU5J2MQALSFVI5LY2733AMX5ACBZCTFDN4BTZZJ743VPA2EU$''',
+  '''^CAKR6ZPDHEXLDJ5TPIYWHO2IJYBXLNH7NU5TR2VTYUZMFX3KCX4JNUPX$''',
+  '''^CCLF5XFG4HISGGJBRZTEB5AQ67TIRB4J3RJCU7Z4ADF3ACM7USR5GSGC$''',
+]
