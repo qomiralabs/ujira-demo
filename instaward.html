@@ -865,7 +865,10 @@ async function renderMcp() {
   let published = null;
   try { const r = await getText(MCP_PKG); published = !r.missing; } catch { published = null; }
   const tag = $("#cTag");
-  if (published === true) { setTag(tag, "live", "Code published"); $("#sum3").textContent = "Four tools, code published"; $("#mcpIntro").textContent = "Add the server to your assistant's MCP settings, then restart it. Testnet only."; }
+  if (published === true) { setTag(tag, "live", "Code published"); $("#sum3").textContent = "Four tools, code published"; const hosted = DATA.page && typeof DATA.page.mcp_url === "string" && /^https:\/\//.test(DATA.page.mcp_url) ? DATA.page.mcp_url : "";
+    $("#mcpIntro").innerHTML = hosted
+      ? `<b>No install:</b> in Claude (web or Desktop) open Settings, Connectors, Add custom connector, name it UJIRA and paste <span class="mono" style="user-select:all;word-break:break-all">${esc(hosted)}</span>. Cursor takes the same URL as a remote MCP server. It is a shared public demo on Stellar testnet: real testnet payouts from the demo mandate, at most 10 USDC each and 5 an hour per visitor, so nothing ever waits for an approver. ${ext(hosted.replace(/\/mcp$/, "/healthz"), "Server health")}<br><br>Or run your own copy against your own mandate with npm, as below. Testnet only.`
+      : "Add the server to your assistant's MCP settings, then restart it. Testnet only."; }
   else if (published === false) {
     setTag(tag, "wip", "In progress"); $("#sum3").textContent = "In progress: server merging today";
     $("#mcpIntro").innerHTML = `<span class="tag wip">In progress</span> The server code is being merged into the repository today. The settings below are what it will take; the README has the final version.`;
