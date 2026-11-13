@@ -845,21 +845,22 @@ function mcpSnippet(cfg) { return JSON.stringify({ mcpServers: { [cfg.name || "u
 function npmPublished() { return !!(DATA.page && DATA.page.npm_published === true); }
 function renderSnippet() {
   const cfg = Object.assign({}, DEFAULT_MCP, (DATA.page && DATA.page.mcp) || {});
-  if (npmPublished()) { cfg.command = "npx"; cfg.args = ["-y", "ujira-mcp"]; cfg.steps = cfg.steps.slice(1); }
+  if (npmPublished()) { cfg.command = "npx"; cfg.args = ["-y", "@ujira/mcp"]; cfg.steps = cfg.steps.slice(1); }
   $("#mcpSnippet").textContent = mcpSnippet(cfg);
   $("#mcpWhere").innerHTML = mcpTab === "claude"
     ? `In Claude Desktop: Settings, Developer, Edit Config. That opens <span class="mono">claude_desktop_config.json</span>; add this to it.`
     : `In Cursor: Settings, MCP, Add new MCP server, or put this in <span class="mono">.cursor/mcp.json</span> in your project.`;
   $("#mcpSteps").innerHTML = (cfg.steps || []).map((s) => `<li><span>${esc(s)}</span></li>`).join("");
   $("#npmNote").innerHTML = npmPublished()
-    ? `Runs the <span class="mono">ujira-mcp</span> package from npm. From a clone, use <span class="mono">node</span> with <span class="mono">/path/to/ujira-mcp/dist/mcp/main.js</span> instead.`
-    : `<span class="tag wip">Publishing today</span> The npm package <span class="mono">ujira-mcp</span> is not out yet. Once it is, the command becomes <span class="mono">npx -y ujira-mcp</span> and no clone is needed. Until then, run it from a clone as shown.`;
+    ? `Runs the <span class="mono">@ujira/mcp</span> package from npm. From a clone, use <span class="mono">node</span> with <span class="mono">/path/to/ujira-mcp/dist/mcp/main.js</span> instead.`
+    : `<span class="tag wip">Publishing today</span> The npm package <span class="mono">@ujira/mcp</span> is not out yet. Once it is, the command becomes <span class="mono">npx -y @ujira/mcp</span> and no clone is needed. Until then, run it from a clone as shown.`;
   for (const [b, k] of [["#tab-claude", "claude"], ["#tab-cursor", "cursor"]]) { const el = $(b); el.setAttribute("aria-selected", String(mcpTab === k)); el.tabIndex = mcpTab === k ? 0 : -1; }
   $("#panel-code").setAttribute("aria-labelledby", mcpTab === "claude" ? "tab-claude" : "tab-cursor");
 }
 async function renderMcp() {
   renderSnippet();
   const links = [ext(GH + "/ujira-mcp", "ujira-mcp on GitHub"), ext(GH + "/ujira-mcp#readme", "README")];
+  if (npmPublished()) links.push(ext("https://www.npmjs.com/package/@ujira/mcp", "@ujira/mcp on npm"));
   $("#mcpLinks").innerHTML = links.map((l) => `<span>${l}</span>`).join("");
   let published = null;
   try { const r = await getText(MCP_PKG); published = !r.missing; } catch { published = null; }
