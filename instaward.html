@@ -521,6 +521,10 @@ function vRun(d) {
       reqTx: isHash(p.request_tx_hash) ? p.request_tx_hash.toLowerCase() : null,
       approveTx: isHash(p.approve_tx_hash) ? p.approve_tx_hash.toLowerCase() : null,
       contractError: p.blocked_by === "contract" && Number.isInteger(p.contract_error) ? p.contract_error : null,
+      sdpTx: isHash(p.sdp_tx_hash) ? p.sdp_tx_hash.toLowerCase() : null,
+      sdpDist: isAccount(p.sdp_distribution) ? p.sdp_distribution : null,
+      sdpPayment: typeof p.sdp_payment_id === "string" ? p.sdp_payment_id.slice(0, 80) : "",
+      name: typeof p.recipient_name === "string" ? p.recipient_name.slice(0, 40) : "",
       sdp: typeof p.sdp_disbursement_id === "string" ? p.sdp_disbursement_id.slice(0, 80) : "",
       at: typeof p.at === "string" ? p.at : "",
     });
@@ -731,7 +735,7 @@ async function renderEngine() {
     </table></div>
     <div class="legend">
       <span><b>USDC</b> paid straight from the mandate contract to the recipient's Stellar wallet.</span>
-      <span><b>SDP</b> paid through the Stellar Disbursement Platform, the open source payout service for Stellar.${P.some((p) => p.rail === "sdp") ? "" : ` <span class="tag wip">In progress</span> No payout in this run went through SDP yet.`}</span>
+      <span><b>SDP</b> paid through the Stellar Disbursement Platform (SDP 7.1.0), on an SDP testnet instance run by the team. The mandate pays the SDP distribution account, then SDP pays the recipient: two transactions, both shown and both checked.${P.some((p) => p.rail === "sdp") ? "" : ` <span class="tag wip">In progress</span> No payout in this run went through SDP yet.`}</span>
       <span>${approvals} payout${approvals === 1 ? "" : "s"} needed a person's approval first. ${src} ${ext(GH + "/ujira-mcp/blob/development/evidence/RUN.md", "How the run was done")}.${run.created ? ` Run recorded ${esc(new Date(run.created).toLocaleString())}.` : ""}</span>
     </div>`;
   setTag(tag, "live", "Live");
@@ -743,11 +747,14 @@ function row(p, i) {
   const code = p.asset || (p.rail === "sdp" ? "USDC" : "USDC");
   const why = p.outcome === "blocked" ? `<span class="why">${esc(reasonText(p.reason) || "Refused by the mandate rules")}${p.contractError != null ? `. Refused by the contract itself, error ${esc(p.contractError)}.` : ""}</span>` : p.outcome === "approval_required" ? `<span class="why">Held by the contract until an approver signs off.</span>` : p.outcome === "approved_then_paid" ? `<span class="why">Over the approval amount, so it waited for an approver, then paid.</span>` : "";
   const txs = [];
-  if (p.tx) txs.push(expertLink("tx", p.tx, esc(short(p.tx))));
+  if (p.rail === "sdp" && p.tx) {
+    txs.push(`<span class="sm">Mandate to SDP: ${expertLink("tx", p.tx, esc(short(p.tx)))}</span>`);
+    txs.push(`<span class="sm">SDP to recipient: ${p.sdpTx ? expertLink("tx", p.sdpTx, esc(short(p.sdpTx))) : "not recorded"}</span>`);
+  } else if (p.tx) txs.push(expertLink("tx", p.tx, esc(short(p.tx))));
   if (p.reqTx && p.reqTx !== p.tx) txs.push(`<span class="sm">Request: ${expertLink("tx", p.reqTx, esc(short(p.reqTx)))}</span>`);
   if (p.approveTx) txs.push(`<span class="sm">Approval: ${expertLink("tx", p.approveTx, esc(short(p.approveTx)))}</span>`);
-  if (p.sdp) txs.push(`<span class="sm">SDP disbursement ${esc(short(p.sdp))}</span>`);
-  const rec = isAccount(p.recipient) ? expertLink("account", p.recipient) : `<span class="addr">${esc(short(p.recipient))}</span>`;
+  if (p.sdp) txs.push(`<span class="sm">SDP disbursement <span class="mono">${esc(p.sdp.slice(0, 8))}</span>${p.sdpPayment ? `, payment <span class="mono">${esc(p.sdpPayment.slice(0, 8))}</span>` : ""}</span>`);
+  const rec = (isAccount(p.recipient) ? expertLink("account", p.recipient) : `<span class="addr">${esc(short(p.recipient))}</span>`) + (p.name ? `<span class="sm">${esc(p.name)}</span>` : "");
   return `<tr>
     <td data-label="Task" class="task"><span class="mono">${esc(p.task || "-")}</span></td>
     <td data-label="Recipient">${rec}</td>
@@ -761,7 +768,29 @@ function row(p, i) {
 /* Asks Horizon for each transaction. A paid row is confirmed when the
    transaction exists and succeeded; the operations then show whether the
    recipient and amount match the receipt. */
+async function verifyLeg(hash, to, amount, decimals) {
+  const r = await getJSON(`${NET.horizon}/transactions/${hash}`, 15000);
+  if (r.missing) return { found: false };
+  const tx = r.data; let match = false;
+  if (tx.successful) {
+    try {
+      const ops = await getJSON(`${NET.horizon}/transactions/${hash}/operations?limit=50`, 15000);
+      const recs = (ops.data && ops.data._embedded && ops.data._embedded.records) || [];
+      for (const op of recs) {
+        if (/^(payment|path_payment_strict_(receive|send))$/.test(op.type) && op.to === to && toMinor(op.amount, decimals) === amount) match = true;
+        for (const c of op.asset_balance_changes || []) if (c.type === "transfer" && c.to === to && toMinor(c.amount, decimals) === amount) match = true;
+      }
+    } catch { /* the transaction itself is confirmed; the match is a bonus */ }
+  }
+  return { found: true, ok: !!tx.successful, ledger: Number(tx.ledger), match };
+}
 async function verifyOne(p) {
+  if (p.rail === "sdp" && p.tx && p.sdpTx) {
+    const [a, b] = await Promise.all([verifyLeg(p.tx, p.sdpDist, p.amount, p.decimals), verifyLeg(p.sdpTx, p.recipient, p.amount, p.decimals)]);
+    if (!a.found || !b.found) return { cls: "bad", ic: "i-x", text: `${!a.found ? "Mandate to SDP" : "SDP to recipient"} leg not found on testnet` };
+    if (!a.ok || !b.ok) return { cls: "bad", ic: "i-x", text: `${!a.ok ? "Mandate to SDP" : "SDP to recipient"} leg failed on chain` };
+    return { cls: "ok", ic: "i-check", text: `Both legs confirmed, ledgers ${a.ledger.toLocaleString("en-US")} and ${b.ledger.toLocaleString("en-US")}${a.match && b.match ? ", recipient and amount match" : ""}` };
+  }
   const hash = p.tx || p.reqTx;
   const r = await getJSON(`${NET.horizon}/transactions/${hash}`, 15000);
   if (r.missing) return { cls: "bad", ic: "i-x", text: "Not found on testnet" };
