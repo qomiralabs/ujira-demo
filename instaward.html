@@ -172,7 +172,7 @@ pre { margin: 10px 0 0; padding: 14px 16px; background: var(--code-bg); border: 
 .stat dd { font: 500 24px/1.3 var(--mono); font-variant-numeric: tabular-nums }
 
 /* payout table */
-.tbl-wrap { border: 1px solid var(--rule); border-radius: 10px; overflow: hidden }
+.tbl-wrap { border: 1px solid var(--rule); border-radius: 10px; overflow-x: auto }
 table { width: 100%; border-collapse: collapse; font-size: 14px }
 th { text-align: left; font: 500 12px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); padding: 12px 14px; background: var(--bg); border-bottom: 1px solid var(--rule) }
 td { padding: 14px; border-bottom: 1px solid var(--rule); vertical-align: top }
@@ -225,16 +225,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) }
   .tools { grid-template-columns: minmax(0, 1fr) }
 }
-@media (max-width: 720px) {
-  h1 { font-size: 30px }
-  .intro { padding: 32px 0 28px }
-  .lede { font-size: 17px }
-  .sec { padding: 20px 16px }
-  .sec-head h2 { font-size: 21px }
-  .bar nav { gap: 14px; font-size: 14px }
-  .bar nav .hide-s { display: none }
-  .rules { grid-template-columns: minmax(0, 1fr) }
-  .rule { border-right: 0 !important }
+@media (max-width: 960px) {
   /* the payout table becomes one card per payout */
   .tbl-wrap { border: 0; border-radius: 0; overflow: visible }
   table, tbody, tr, td { display: block; width: 100% }
@@ -246,6 +237,17 @@ footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px }
   td::before { content: attr(data-label); font: 500 11px/1.6 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2) }
   td.amt { text-align: left }
   td .why { max-width: none }
+}
+@media (max-width: 720px) {
+  h1 { font-size: 30px }
+  .intro { padding: 32px 0 28px }
+  .lede { font-size: 17px }
+  .sec { padding: 20px 16px }
+  .sec-head h2 { font-size: 21px }
+  .bar nav { gap: 14px; font-size: 14px }
+  .bar nav .hide-s { display: none }
+  .rules { grid-template-columns: minmax(0, 1fr) }
+  .rule { border-right: 0 !important }
   .video { grid-template-columns: minmax(0, 1fr) }
   .codebox pre { padding-right: 16px; padding-top: 48px }
 }
@@ -360,6 +362,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px }
       <div class="codebox" id="panel-code" role="tabpanel" aria-labelledby="tab-claude">
         <p class="note" id="mcpWhere"></p>
         <pre><code id="mcpSnippet"></code></pre>
+        <p class="note" id="npmNote"></p>
         <button class="btn small" type="button" id="copySnippet"><svg aria-hidden="true"><use href="#i-copy"/></svg>Copy</button>
       </div>
       <div class="meta" id="mcpLinks"></div>
@@ -517,6 +520,7 @@ function vRun(d) {
       tx: isHash(p.tx_hash) ? p.tx_hash.toLowerCase() : null,
       reqTx: isHash(p.request_tx_hash) ? p.request_tx_hash.toLowerCase() : null,
       approveTx: isHash(p.approve_tx_hash) ? p.approve_tx_hash.toLowerCase() : null,
+      contractError: p.blocked_by === "contract" && Number.isInteger(p.contract_error) ? p.contract_error : null,
       sdp: typeof p.sdp_disbursement_id === "string" ? p.sdp_disbursement_id.slice(0, 80) : "",
       at: typeof p.at === "string" ? p.at : "",
     });
@@ -683,8 +687,8 @@ const OUT = {
   blocked: ["blocked", "i-x", "Blocked"],
 };
 const REASONS = [
-  [/per.?payment|over.?cap|cap/i, "Over the per payment cap"],
   [/daily/i, "Over the recipient's daily limit"],
+  [/per.?payment|payment.?cap|over.?cap|cap/i, "Over the per payment cap"],
   [/budget|insufficient|exceed/i, "More than the budget left"],
   [/allow|recipient.?not/i, "Recipient is not on the allowlist"],
   [/pause/i, "The mandate is paused"],
@@ -695,7 +699,7 @@ function reasonText(r) {
   if (!r) return "";
   if (/\s/.test(r) && r.length > 24) return r; // already a sentence
   const hit = REASONS.find(([re]) => re.test(r));
-  return hit ? `${hit[1]} (${r})` : r.replace(/_/g, " ");
+  return hit ? hit[1] : r.replace(/_/g, " ");
 }
 async function renderEngine() {
   const tag = $("#eTag"), body = $("#engineBody");
@@ -727,8 +731,8 @@ async function renderEngine() {
     </table></div>
     <div class="legend">
       <span><b>USDC</b> paid straight from the mandate contract to the recipient's Stellar wallet.</span>
-      <span><b>SDP</b> paid through the Stellar Disbursement Platform, the open source payout service for Stellar.</span>
-      <span>${approvals} payout${approvals === 1 ? "" : "s"} needed a person's approval first. ${src}${run.created ? ` Run recorded ${esc(new Date(run.created).toLocaleString())}.` : ""}</span>
+      <span><b>SDP</b> paid through the Stellar Disbursement Platform, the open source payout service for Stellar.${P.some((p) => p.rail === "sdp") ? "" : ` <span class="tag wip">In progress</span> No payout in this run went through SDP yet.`}</span>
+      <span>${approvals} payout${approvals === 1 ? "" : "s"} needed a person's approval first. ${src} ${ext(GH + "/ujira-mcp/blob/development/evidence/RUN.md", "How the run was done")}.${run.created ? ` Run recorded ${esc(new Date(run.created).toLocaleString())}.` : ""}</span>
     </div>`;
   setTag(tag, "live", "Live");
   $("#sum2").textContent = `${P.length} test payouts: ${paid} paid, ${blocked} blocked`;
@@ -737,7 +741,7 @@ async function renderEngine() {
 function row(p, i) {
   const o = OUT[p.outcome];
   const code = p.asset || (p.rail === "sdp" ? "USDC" : "USDC");
-  const why = p.outcome === "blocked" ? `<span class="why">${esc(reasonText(p.reason) || "Refused by the mandate rules")}</span>` : p.outcome === "approval_required" ? `<span class="why">Held by the contract until an approver signs off.</span>` : p.outcome === "approved_then_paid" ? `<span class="why">Over the approval amount, so it waited for an approver, then paid.</span>` : "";
+  const why = p.outcome === "blocked" ? `<span class="why">${esc(reasonText(p.reason) || "Refused by the mandate rules")}${p.contractError != null ? `. Refused by the contract itself, error ${esc(p.contractError)}.` : ""}</span>` : p.outcome === "approval_required" ? `<span class="why">Held by the contract until an approver signs off.</span>` : p.outcome === "approved_then_paid" ? `<span class="why">Over the approval amount, so it waited for an approver, then paid.</span>` : "";
   const txs = [];
   if (p.tx) txs.push(expertLink("tx", p.tx, esc(short(p.tx))));
   if (p.reqTx && p.reqTx !== p.tx) txs.push(`<span class="sm">Request: ${expertLink("tx", p.reqTx, esc(short(p.reqTx)))}</span>`);
@@ -800,18 +804,27 @@ const DEFAULT_MCP = {
   name: "ujira",
   command: "node",
   args: ["/path/to/ujira-mcp/dist/mcp/main.js"],
-  env: {},
-  steps: ["Clone qomiralabs/ujira-mcp and build it: npm ci, then npm run build.", "Paste the settings below into your assistant and fill in the path.", "Restart the assistant and ask it to quote a payout."],
+  env: {
+    UJIRA_MANDATE_FILE: "/home/you/.config/ujira-testnet/mine/mandate.json",
+    UJIRA_AGENT_KEY_FILE: "/home/you/.config/ujira-testnet/mine/identity/agent.toml",
+    UJIRA_EXECUTOR_KEY_FILE: "/home/you/.config/ujira-testnet/mine/identity/executor.toml",
+  },
+  steps: ["Clone qomiralabs/ujira-mcp and build it: npm ci, then npm run build.", "Make a testnet mandate and its agent and executor keys, as the README shows. Keys stay in files on your machine, never in the settings.", "Paste the settings below into your assistant, with your own absolute paths, then restart it and ask it to quote a payout."],
 };
 let mcpTab = "claude";
 function mcpSnippet(cfg) { return JSON.stringify({ mcpServers: { [cfg.name || "ujira"]: { command: cfg.command, args: cfg.args, ...(cfg.env && Object.keys(cfg.env).length ? { env: cfg.env } : {}) } } }, null, 2); }
+function npmPublished() { return !!(DATA.page && DATA.page.npm_published === true); }
 function renderSnippet() {
   const cfg = Object.assign({}, DEFAULT_MCP, (DATA.page && DATA.page.mcp) || {});
+  if (npmPublished()) { cfg.command = "npx"; cfg.args = ["-y", "ujira-mcp"]; cfg.steps = cfg.steps.slice(1); }
   $("#mcpSnippet").textContent = mcpSnippet(cfg);
   $("#mcpWhere").innerHTML = mcpTab === "claude"
     ? `In Claude Desktop: Settings, Developer, Edit Config. That opens <span class="mono">claude_desktop_config.json</span>; add this to it.`
     : `In Cursor: Settings, MCP, Add new MCP server, or put this in <span class="mono">.cursor/mcp.json</span> in your project.`;
   $("#mcpSteps").innerHTML = (cfg.steps || []).map((s) => `<li><span>${esc(s)}</span></li>`).join("");
+  $("#npmNote").innerHTML = npmPublished()
+    ? `Runs the <span class="mono">ujira-mcp</span> package from npm. From a clone, use <span class="mono">node</span> with <span class="mono">/path/to/ujira-mcp/dist/mcp/main.js</span> instead.`
+    : `<span class="tag wip">Publishing today</span> The npm package <span class="mono">ujira-mcp</span> is not out yet. Once it is, the command becomes <span class="mono">npx -y ujira-mcp</span> and no clone is needed. Until then, run it from a clone as shown.`;
   for (const [b, k] of [["#tab-claude", "claude"], ["#tab-cursor", "cursor"]]) { const el = $(b); el.setAttribute("aria-selected", String(mcpTab === k)); el.tabIndex = mcpTab === k ? 0 : -1; }
   $("#panel-code").setAttribute("aria-labelledby", mcpTab === "claude" ? "tab-claude" : "tab-cursor");
 }
@@ -822,7 +835,7 @@ async function renderMcp() {
   let published = null;
   try { const r = await getText(MCP_PKG); published = !r.missing; } catch { published = null; }
   const tag = $("#cTag");
-  if (published === true) { setTag(tag, "live", "Code published"); $("#sum3").textContent = "Four tools, code published"; }
+  if (published === true) { setTag(tag, "live", "Code published"); $("#sum3").textContent = "Four tools, code published"; $("#mcpIntro").textContent = "Add the server to your assistant's MCP settings, then restart it. Testnet only."; }
   else if (published === false) {
     setTag(tag, "wip", "In progress"); $("#sum3").textContent = "In progress: server merging today";
     $("#mcpIntro").innerHTML = `<span class="tag wip">In progress</span> The server code is being merged into the repository today. The settings below are what it will take; the README has the final version.`;
