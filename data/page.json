@@ -1,0 +1,4 @@
+{
+  "_comment": "Paste the demo video link into demo_video_url (https only). The testnet proof page reads this file when it loads.",
+  "demo_video_url": ""
+}
