@@ -279,6 +279,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px }
     </a>
     <nav aria-label="Site">
       <a href="index.html" class="hide-s">Website</a>
+      <a href="https://ujira-mcp-production.up.railway.app/" rel="noopener">Try the console</a>
       <a href="app.html">Testnet dashboard</a>
       <a href="https://github.com/qomiralabs" rel="noopener">GitHub</a>
     </nav>
@@ -288,10 +289,11 @@ footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px }
 <div class="wrap intro">
   <p class="label">Testnet proof</p>
   <h1>See UJIRA working on Stellar testnet</h1>
-  <p class="lede">Three parts, each checked as this page opens. Your browser asks Stellar testnet directly, so nothing below is a screenshot or a copy we typed in. Every link opens stellar.expert, an explorer UJIRA does not run.</p>
+  <p class="lede">Three parts, each checked as this page opens. Your browser asks Stellar testnet directly, so nothing below is a screenshot or a copy we typed in. Every link opens stellar.expert, an explorer UJIRA does not run. To try it yourself, open the <a href="https://ujira-mcp-production.up.railway.app/" rel="noopener">UJIRA Console</a>: connect a testnet wallet (Freighter, or Albedo with nothing to install), get test USDC, create your own mandate, and let an agent pay inside your rules. No terminal needed.</p>
   <div class="net">
     <span class="net-status" id="netStatus" role="status" aria-live="polite"><span class="dot"></span>Connecting to Stellar testnet</span>
-    <button class="btn primary" id="recheck" type="button"><svg aria-hidden="true"><use href="#i-refresh"/></svg>Check everything again</button>
+    <a class="btn primary" href="https://ujira-mcp-production.up.railway.app/" rel="noopener">Try it yourself in the UJIRA Console</a>
+    <button class="btn" id="recheck" type="button"><svg aria-hidden="true"><use href="#i-refresh"/></svg>Check everything again</button>
   </div>
 </div>
 <div class="weave" aria-hidden="true"></div>
